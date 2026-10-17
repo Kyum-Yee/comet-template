@@ -1,0 +1,33 @@
+{
+  "kind": "cinema",
+  "title": "비 오는 도서관",
+  "description": "폐관 30분 전, 비에 갇힌 시립도서관. 반납 데스크의 사서 린이 오늘따라 퇴근을 미룹니다.\n\n- 비주얼노벨 대사창 템플릿을 씁니다(배경·인물·이름표·상태창).\n- 화면 터치·→·Space로 넘기고, S로 상태창을 엽니다.",
+  "visibility": "private",
+  "thumbnail": "thumb.png",
+  "tags": ["일상", "로맨스", "도서관"],
+  "defaultModel": "gemini-2.5-pro",
+  "template": "../vn-dialogue/template.json",
+  "prompt": "@prompt.md",
+  "lorebookBudget": 500,
+  "images": {
+    "도서관_밤": {"src": "img/library-night.png", "desc": "비 오는 밤의 열람실"},
+    "린_미소": {"src": "img/rin-smile.png", "desc": "린, 옅은 미소"},
+    "린_놀람": {"src": "img/rin-surprised.png", "desc": "린, 놀란 얼굴"}
+  },
+  "startSessions": [
+    {
+      "sessionTitle": "폐관 30분 전",
+      "initDesc": "# {user}의 신분\n매주 목요일 같은 자리에 앉는 단골 이용자.\n# 현재 상황\n폭우로 버스가 끊겼고, 열람실에는 {user}와 린 둘만 남았다.",
+      "defaults": {"배경": "도서관_밤", "상태": "열람실 · 오후 9시 30분 · 폭우"},
+      "logs": [
+        ["대사", "*창문을 때리는 빗소리가 열람실을 채운다.*"],
+        ["인물", "린_미소"],
+        ["이름", "린"],
+        ["대사", "오늘도 끝까지 계시네요. 버스, 끊긴 거 아세요?"],
+        ["인물", "린_놀람"],
+        ["대사", "아, 혹시… 그 책 반납 기한이 오늘인 건요?"]
+      ]
+    }
+  ],
+  "lorebooks": "@lorebooks.json"
+}

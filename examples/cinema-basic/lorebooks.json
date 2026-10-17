@@ -1,0 +1,8 @@
+[
+ {"title": "철거 소식", "useDefault": false,
+  "content": "도서관은 내년 봄 철거된다. 린은 시청 공문을 서랍에 넣어 두었다. 이용자가 도서관의 미래나 리모델링을 물으면 린은 대답을 피하다가, 세 번째 질문에서 사실을 말한다.",
+  "triggers": [
+   {"type": "keyword", "action": "block", "keyword": "꿈속", "watchPrevChat": true, "watchUserChat": true},
+   {"type": "regex", "action": "apply", "regex": "(철거|리모델링|문 닫|없어지)", "watchPrevChat": false, "watchUserChat": true}
+  ]}
+]

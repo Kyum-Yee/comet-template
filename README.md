@@ -1,6 +1,6 @@
 # comet-template
 
-코멧([comet-talk.ai](https://comet-talk.ai)) 시네마챗 **템플릿**을 JSON 스펙 한 장과 Python(또는 줄 단위 DSL) 스크립트로 만들고, 사이트 에디터의 블록 코딩으로 컴파일해 바로 올리는 도구입니다. 사이트 해석기·렌더러를 옮겨 와서 오프라인 검사, PNG 미리보기, 클릭·키·애니메이션 시뮬레이션까지 사이트와 같은 규칙으로 돌립니다. 노벨챗 매크로·로어북 JSON과 정규식도 사이트와 같은 순서와 위험 판정으로 검사·실행합니다.
+코멧([comet-talk.ai](https://comet-talk.ai)) 시네마챗 **템플릿**을 JSON 스펙 한 장과 Python(또는 줄 단위 DSL) 스크립트로 만들고, 사이트 에디터의 블록 코딩으로 컴파일해 바로 올리는 도구입니다. **노벨챗·시네마챗 작품**도 스펙 한 장(프롬프트·시작 세션·이미지·매크로·로어북)으로 검사하고 올리고 고치고 내려받습니다. 사이트 해석기·렌더러를 옮겨 와서 오프라인 검사, PNG 미리보기, 클릭·키·애니메이션 시뮬레이션까지 사이트와 같은 규칙으로 돌립니다. 노벨챗 매크로·로어북 JSON과 정규식도 사이트와 같은 순서와 위험 판정으로 검사·실행합니다.
 
 명령줄 도구(`comet`)이면서 [Claude Code](https://claude.com/claude-code) 스킬입니다. 스킬로 설치하면 "시네마챗 템플릿 만들어줘" 같은 요청에 에이전트가 이 문서들(SKILL.md·RULES.md·GUIDE.md)을 읽고 설계부터 업로드까지 진행합니다.
 
@@ -74,11 +74,22 @@ comet login                                          # 처음 한 번 (setup에�
 comet upload 내대사창/template.json                  # 파일 업로드 → 등록 → 저장본 대조
 ```
 
-노벨챗:
+노벨챗·시네마챗 작품:
+
+```bash
+comet new 등대 --example novel-basic && comet upload 등대/novel.json        # 비공개 등록
+comet new 도서관 --example cinema-basic                                  # 템플릿 예제가 도서관/template/에 같이 옴
+comet upload 도서관/template/template.json                               # 시네마챗이 쓸 템플릿 먼저
+comet preview 도서관/cinema.json -o first.png                            # 플레이어가 처음 보는 화면
+comet upload 도서관/cinema.json
+comet list --kind novel · comet pull --kind cinema <ID> -o 작품/cinema.json · comet delete --kind novel <ID> --yes
+```
+
+노벨챗 매크로·정규식:
 
 ```bash
 comet regex check '\{\{img::(.*?)\}\}'               # 사이트와 같은 위험(safe-regex)·JS 문법 판정
-comet macro test macros.json @출력예시.txt --user 민준 --trace
+comet macro test 등대/novel.json @출력예시.txt --user 민준 --trace   # 이미지 매크로까지 저장될 순서로
 comet lorebook check lore.json
 ```
 

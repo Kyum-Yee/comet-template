@@ -1,0 +1,12 @@
+[
+ {"title": "편지의 비밀", "useDefault": false,
+  "content": "주인 없는 편지는 모두 같은 만년필 잉크로 쓰였다. 마을에서 그 잉크를 파는 곳은 등대 맞은편 문구점 한 곳뿐이고, 주인 할머니는 3년 전부터 같은 손님에게만 그 잉크를 판다고 말한다.",
+  "triggers": [
+   {"type": "regex", "action": "apply", "regex": "(편지|봉투|잉크|만년필)", "watchPrevChat": true, "watchUserChat": true}
+  ]},
+ {"title": "폭풍의 밤", "useDefault": false,
+  "content": "열 턴마다 바다에 폭풍이 온다. 폭풍이 오면 등대 불빛이 깜빡이고 해온은 창가를 떠나지 못한다. 그날 밤 편지가 한 통 더 도착한다.",
+  "triggers": [
+   {"type": "turn", "action": "apply", "from": 10, "to": 10, "remainder": 10}
+  ]}
+]

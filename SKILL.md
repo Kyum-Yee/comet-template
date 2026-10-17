@@ -1,15 +1,15 @@
 ---
 name: comet-template
-description: 코멧(comet-talk.ai) 시네마챗 템플릿을 JSON 스펙과 Python(또는 들여쓰기 DSL) 스크립트로 만들어 블록 코딩으로 컴파일하고, 오프라인 검사·PNG 미리보기·클릭 시뮬레이션을 거쳐 파이썬으로 바로 업로드한다. 올린 템플릿을 스펙·Python으로 내려받는다. 노벨챗 매크로·로어북 JSON과 정규식을 사이트와 같은 규칙(JS 문법, safe-regex 위험 판정, 매크로 실행 순서, {user} 조사 보정)으로 검사·실행하고, 시네마챗·노벨챗 제작 가이드를 담는다. 처음 쓸 때는 `comet setup`이 설치·설정·로그인을 한 번에 한다. Trigger — "코멧 템플릿", "코멧 설치", "comet setup", "시네마챗 템플릿 만들어", "시네마챗 UI", "템플릿 업로드", "노벨챗 매크로", "코멧 정규식", "코멧 로어북", "comet-talk", "/comet-template".
+description: 코멧(comet-talk.ai) 시네마챗 템플릿을 JSON 스펙과 Python(또는 들여쓰기 DSL) 스크립트로 만들어 블록 코딩으로 컴파일하고, 오프라인 검사·PNG 미리보기·클릭 시뮬레이션을 거쳐 파이썬으로 바로 업로드한다. 노벨챗·시네마챗 작품도 스펙 한 장(프롬프트·시작 세션·이미지·매크로·로어북)으로 검사·업로드·수정·내려받기·삭제하고, 시네마챗 첫 화면을 미리 그린다. 올린 템플릿을 스펙·Python으로 내려받는다. 노벨챗 매크로·로어북 JSON과 정규식을 사이트와 같은 규칙(JS 문법, safe-regex 위험 판정, 매크로 실행 순서, {user} 조사 보정)으로 검사·실행하고, 시네마챗·노벨챗 제작 가이드를 담는다. 처음 쓸 때는 `comet setup`이 설치·설정·로그인을 한 번에 한다. Trigger — "코멧 템플릿", "코멧 설치", "comet setup", "시네마챗 템플릿 만들어", "시네마챗 UI", "템플릿 업로드", "노벨챗 업로드", "시네마챗 업로드", "노벨챗 매크로", "코멧 정규식", "코멧 로어북", "comet-talk", "/comet-template".
 ---
 
-# comet-template — 코멧 시네마챗 템플릿 제작·업로드
+# comet-template — 코멧 템플릿·노벨챗·시네마챗 제작·업로드
 
-시네마챗은 16:9 화면에서 AI가 낸 **로그**(변수 하나를 새 값으로 바꾸는 단위)를 하나씩 재생하는 채팅이다. **템플릿**은 그 화면의 UI다: 변수, 1280×720 캔버스 위 오브젝트(텍스트·이미지·프레임), 블록 스크립트, 스토리지, 트리거. 이 도구는 템플릿 하나를 `template.json` 스펙 한 장(+ 로직 파일 `logic.py`)으로 다룬다.
+시네마챗은 16:9 화면에서 AI가 낸 **로그**(변수 하나를 새 값으로 바꾸는 단위)를 하나씩 재생하는 채팅이다. **템플릿**은 그 화면의 UI다: 변수, 1280×720 캔버스 위 오브젝트(텍스트·이미지·프레임), 블록 스크립트, 스토리지, 트리거. 이 도구는 템플릿 하나를 `template.json` 스펙 한 장(+ 로직 파일 `logic.py`)으로, 노벨챗·시네마챗 작품 하나를 `novel.json`·`cinema.json` 스펙 한 장으로 다룬다(11장). 스펙의 `kind`(template 기본·novel·cinema)를 보고 `check`·`upload`·`preview`가 갈라진다.
 
 | 문서 | 언제 읽나 |
 |---|---|
-| 이 문서 | 명령, 스펙 필드, DSL, 렌더·입력 규칙, 미리보기, 업로드 |
+| 이 문서 | 명령, 템플릿 스펙 필드, DSL, 렌더·입력 규칙, 미리보기, 업로드, 노벨챗·시네마챗 스펙(11장) |
 | [RULES.md](RULES.md) | 스크립트를 Python으로 쓸 때: 구문 → 블록 대응, JS 값 규칙, 풀어 쓰기, `logic.py` |
 | [GUIDE.md](GUIDE.md) | 시네마챗·노벨챗 제작 전반: 칸별 제한, 프롬프트, 로어북, 매크로·정규식, 이미지, 점검표 |
 
@@ -39,27 +39,29 @@ comet <명령> …        # comet setup이 설치한 명령. 없으면: uv run <
 | `config [show]` · `config get K` · `config set K V` · `config unset K` · `config material add 경로 --when 단계` · `config material remove 경로` · `config path` | 설정 보기·바꾸기(`<설정 폴더>/config.json`). 경로 값은 절대 경로로 저장된다 |
 | `login [--sid 값] [--profile 'Profile 1']` | 크롬에 로그인된 코멧 세션(`connect.sid`)을 가져와 `<설정 폴더>/session.json`(600)에 저장. 크롬 프로필을 임시 폴더에 복사해 헤드리스로 띄우고 CDP로 쿠키를 받는다. 실제 크롬과 키체인은 건드리지 않는다 |
 | `whoami` | 세션 계정 |
-| `new <폴더> [--example vn-dialogue]` | 예제를 복사해 새 작업 폴더 |
-| `check spec.json [--strict] [--show]` | 오프라인 검사. 오류는 업로드 차단, 경고는 의도 확인용. `--show`는 스크립트를 정규형으로 다시 출력 |
-| `preview spec.json [옵션]` | PNG와 레이어 상태표. 아래 "미리보기" |
-| `upload spec.json [--new] [--id ID] [--public] [--dry-run -o p.json]` | 검사 → 로컬 파일 업로드(내용 해시 캐시) → 등록/수정 → 서버 저장본 대조 |
-| `list [--own]` | 내가 올린 템플릿 / `--own`: 시네마챗에서 고를 수 있는 템플릿(보유·구매 포함) |
+| `new <폴더> [--example vn-dialogue\|vn-dialogue-py\|novel-basic\|cinema-basic]` | 예제를 복사해 새 작업 폴더. `cinema-basic`은 템플릿 예제를 `template/`에 함께 복사한다 |
+| `check spec.json [--strict] [--show]` | 오프라인 검사(템플릿·노벨챗·시네마챗). 오류는 업로드 차단, 경고는 의도 확인용. `--show`는 템플릿 스크립트를 정규형으로 다시 출력 |
+| `preview spec.json [옵션] [--session N] [--log N]` | PNG와 레이어 상태표. 아래 "미리보기". 시네마챗 스펙이면 그 템플릿에 시작 세션 기본값과 인트로 로그를 넣고 등록 이미지로 그린다 |
+| `upload spec.json [--new] [--id ID] [--public] [--dry-run -o p.json]` | 검사 → 로컬 파일 업로드(내용 해시 캐시) → 등록/수정 → 서버 저장본 대조. 템플릿·노벨챗·시네마챗 공통 |
+| `list [--own] [--kind novel\|cinema]` | 내가 올린 템플릿 / `--own`: 시네마챗에서 고를 수 있는 템플릿(보유·구매 포함) / `--kind`: 내 노벨챗·시네마챗 |
+| `models` | 기본 모델로 쓸 수 있는 모델 ID와 시네마챗 가능 여부 |
 | `pull <ID> [-o spec.json] [--raw] [--lang py]`, `pull --own N` | 템플릿을 스펙으로 풀어 내려받기. `--lang py`면 스크립트를 옆의 `logic.py`(Python)로. 남의 공개 템플릿·기본 템플릿 연구용 |
-| `delete <ID> --yes` | 내 템플릿 삭제(되돌릴 수 없음) |
+| `pull --kind novel\|cinema <ID> -o 폴더/스펙.json [--raw]` | 내 노벨챗·시네마챗을 스펙으로. 긴 글·목록은 옆 파일(`prompt.md`·`macros.json`·`lorebooks.json`)로 쓰고 `@파일`로 가리킨다 |
+| `delete <ID> [--kind novel\|cinema] --yes` | 내 템플릿·노벨챗·시네마챗 삭제(되돌릴 수 없음, 플레이 세션 수를 보여 주고 멈춤) |
 | `assets panel·button·hit·pad·thumb …` | UI 소재 PNG. 아래 "소재" |
 | `py state·action·value '<코드>' [--spec s.json] [--module logic.py] [--json]` | Python 한 토막 → 블록(에디터 모양)과 다시 Python. RULES.md |
 | `dsl state·action·value '<코드>' [--decompile]` | DSL 한 토막을 노드 JSON으로 |
 | `regex check 패턴… [--json]` | 사이트와 같은 위험(safe-regex 2.1.1)·JS 문법 판정, 캡처 수, JS/Python 차이 함정. 위험이면 종료 코드 1 |
 | `regex test 패턴 글 [--to 대체식]` | node로 JS 그대로 매치·치환(`g`) |
 | `regex range LO HI` · `regex words 말…` · `regex image --names a,b --range 1 10 --url '…/$1/$2.webp' [--default N] [--anon URL] [-o f.json]` | 수 범위·단어 목록 정규식(반복 0개), 이미지 매크로 네 단계 JSON |
-| `macro check m.json [--strict]` · `macro test m.json 글 [--user 이름] [--turn N] [--trace]` | 노벨챗 매크로 JSON 규격·정규식 검사 / 사이트 엔진과 같은 순서로 실행(체인, 위험 매크로 건너뛰기, `{user}` 조사 보정까지) |
+| `macro check m.json [--strict]` · `macro test m.json 글 [--user 이름] [--turn N] [--trace]` | 노벨챗 매크로 JSON 규격·정규식 검사 / 사이트 엔진과 같은 순서로 실행(체인, 위험 매크로 건너뛰기, `{user}` 조사 보정까지). `m.json` 자리에 노벨챗 스펙을 주면 이미지 매크로까지 저장될 순서 그대로 돈다 |
 | `lorebook check l.json [--strict]` | 로어북 JSON 규격·트리거·정규식 검사 |
 
 글 인자는 `@파일`이나 `-`(stdin)로도 준다. `regex test`·`macro test`는 node가 필요하다(정확한 JS 실행). 없으면 `check`는 정적 검사만 한다.
 
 설정 폴더는 `~/.config/comet-template`(환경변수 `COMET_CONFIG_DIR`로 바꿈)다.
 
-작업 흐름: (처음 한 번 `setup`) → `login` → `new` → 스펙 편집 → `check` → `preview`(눈으로 확인, 클릭 시뮬레이션) → `upload` → 결과 링크의 편집 화면에서 "스크립트 실행"으로 실물 확인. 같은 스펙을 다시 `upload`하면 옆의 `template.comet.json`에 적힌 ID를 **수정**한다(새로 만들려면 `--new`). 완성품은 설정 `works_dir` 아래 `{템플릿,시네마챗,노벨챗}/`에 작품별 폴더로 둔다.
+작업 흐름: (처음 한 번 `setup`) → `login` → `new` → 스펙 편집 → `check` → `preview`(눈으로 확인, 클릭 시뮬레이션) → `upload` → 결과 링크의 편집 화면에서 "스크립트 실행"으로 실물 확인. 같은 스펙을 다시 `upload`하면 옆의 `<스펙>.comet.json`에 적힌 ID를 **수정**한다(새로 만들려면 `--new`). 완성품은 설정 `works_dir` 아래 `{템플릿,시네마챗,노벨챗}/`에 작품별 폴더로 둔다.
 
 ## 1. 동작 모델 (이걸 알아야 설계가 맞는다)
 
@@ -269,6 +271,77 @@ comet preview template.json -o out.png \
 - `session.json`은 계정 열쇠다. 공유·커밋하지 않는다(파일 권한 600).
 - 401이 나면 크롬에서 코멧에 다시 로그인한 뒤 `comet login`.
 
+## 11. 노벨챗·시네마챗 스펙
+
+작품 하나 = 스펙 한 장. 사이트 편집기의 칸을 그대로 옮기되, 긴 글과 목록은 `"@파일"`(스펙 폴더 기준, `.md`·`.txt`·`.json`)로 옆 파일에 둘 수 있다. 칸별 제한과 쓰는 법은 GUIDE.md 3~8장. 예제: `comet new 폴더 --example novel-basic`, `--example cinema-basic`.
+
+### 공통 칸
+
+| 칸 | 값 |
+|---|---|
+| `kind` | `"novel"` 또는 `"cinema"` (필수) |
+| `title` · `description` | 1~20자 · 1~2500자 |
+| `visibility` | `private`(기본) · `link`(링크 공개) · `public` |
+| `thumbnail` | 로컬 파일(16:9가 아니면 가운데 잘라 올림) 또는 image.comet-talk.ai URL. 필수 |
+| `tags` | 연관 키워드 10개까지, 하나에 10자 |
+| `defaultModel` | 모델 ID(`comet models`). 시네마챗은 시네마 가능 모델만. 기본 `gemini-2.5-pro` |
+| `prompt` | 본문. `"@prompt.md"` 권장 |
+| `lorebookBudget` | 노벨챗 0~7500, 시네마챗 0~5000, 250 단위 |
+| `lorebooks` | `lorebook check`와 같은 JSON(배열 또는 `"@lorebooks.json"`). 올릴 때 저장 형식으로 바꾼다 |
+| `startSessions` | 1~10개, `sessionTitle` 15자 |
+
+### 노벨챗 (`novel.json`)
+
+```jsonc
+{"kind": "novel", "title": "…", "description": "…", "thumbnail": "thumb.png", "tags": ["…"],
+ "defaultModel": "gemini-2.5-pro", "allowLog": false,          // 캐릭터 정보 제공(학습 허용)
+ "prompt": "@prompt.md", "lorebookBudget": 1000, "playGuide": "…(2000자)",
+ "startSessions": [{"sessionTitle": "…", "initDesc": "시작 상황", "initChat": "시작 대화"}],
+ "images": {"1": "img/1.png", "2": "img/2.png"},                // 편집기 이미지 버튼과 같음: {{img::키}} → ![](URL)
+ "macros": "@macros.json", "lorebooks": "@lorebooks.json"}
+```
+
+`images`는 매크로 맨 앞에 일대일 치환으로 들어가고, `macros`가 그 뒤에 이어진다. 그래서 "남은 `{{img::…}}` 지우기" 같은 정리 매크로를 `macros` 끝에 둬도 이미지가 먼저 바뀐다. `comet macro test novel.json @출력.txt --user 이름`이 저장될 순서 그대로 돌린다.
+
+### 시네마챗 (`cinema.json`)
+
+```jsonc
+{"kind": "cinema", "title": "…", "description": "…", "thumbnail": "thumb.png", "tags": ["…"],
+ "defaultModel": "gemini-2.5-pro",
+ "template": "../내템플릿/template.json",   // 템플릿 스펙 경로(올린 뒤 .comet.json의 ID) | 템플릿 ID | "keep"
+ "prompt": "@prompt.md", "lorebookBudget": 500,
+ "images": {"도서관_밤": "img/a.png", "린_미소": {"src": "img/b.png", "desc": "설명 30자"}},  // 이름 15자 = 프레임 값
+ "startSessions": [{"sessionTitle": "…", "initDesc": "시작 상황",
+                    "defaults": {"배경": "도서관_밤"},                    // 변수 기본값(합 250자)
+                    "logs": [["대사", "*빗소리*"], ["인물", "린_미소"]]}],  // 인트로 로그(40개·합 1000자)
+ "lorebooks": "@lorebooks.json"}
+```
+
+- **템플릿은 사본으로 저장된다.** 올릴 때 `/get/ownTemplate`에서 그 템플릿의 현재 사본(변수·레이어·스토리지·트리거)을 받아 작품에 넣는다. 템플릿을 고친 뒤 작품에 반영하려면 작품을 다시 `upload`한다. `"keep"`(수정 때 기본, `pull`이 쓰는 값)은 저장된 사본을 그대로 둔다. 새 작품에는 `template`이 필수다.
+- 템플릿 스펙 경로를 주면 `check`가 오프라인으로 그 템플릿을 컴파일해 검사한다: `defaults`·`logs`의 변수 이름, 시스템 변수에 쓴 인트로 로그(경고), 그리고 **프레임이 직접 보여 주는 변수에 등록되지 않은 이미지 이름**(경고: 빈 화면이 됨). 템플릿 ID나 `keep`이면 이 검사는 `upload` 때 서버 사본으로 한다.
+- `defaults`는 템플릿 변수 순서대로 `initSession` 배열이 된다(없는 변수는 빈 값).
+- `comet preview cinema.json`은 기본값을 깔고 인트로 로그를 첫 "자동 넘기기 아님" 로그까지 적용한 화면, 곧 플레이어가 처음 보는 화면을 등록 이미지로 그린다. `--log N`은 정확히 N개, `--session N`은 다른 시작 세션.
+
+### 프로 모드 전용이 되는 경우
+
+기본 모드 한도를 넘으면 사이트는 작품을 프로 모드 전용으로 표시한다. 도구는 오류가 아니라 "프로 모드" 경고로 알리고, 프로 한도를 넘으면 오류로 막는다.
+
+| | 노벨챗 | 시네마챗 |
+|---|---|---|
+| 프롬프트(공백 제외) + 로어북 예산 | 12500 초과 → 프로(프롬프트 최대 25만) | 7500 초과 → 프로(최대 7.5만) |
+| 로어북 하나 | 공백 제외 > 예산 | 같음 |
+| 시작 상황 | 공백 제외 1000자 또는 1500자 초과 | 같음 |
+| 시작 대화(노벨) · 인트로(시네마) | 1000자 초과 | 40개 또는 합 1000자 초과(최대 400개·1만) |
+| 기본값 · 이미지 | — | 기본값 합 250자 초과 · 이미지 100장 초과(최대 1000) |
+
+### 서버 동작 (2026-10-17 실측)
+
+- 엔드포인트: 노벨챗 `POST /upload/newnovel`·`/upload/novel/{id}`, 시네마챗은 플랫폼 이름이 "character"라 `POST /upload/newcharacter`·`/upload/character/{id}`. 목록 `/get/mynovel`·`/get/mycharacter`, 저장본 `/get/postNovel/{id}`·`/get/postCharacter/{id}`, 삭제 `POST /delete/novel|character/{id}`. 링크 `https://comet-talk.ai/build|detail/novel|cinema/<ID>`.
+- 성공은 빈 200, 실패는 400 `{msg, goto}`(goto = 편집기 탭: 1 기본 정보, 2 프롬프트, 3 시작 대화, 4 이미지, 5 로어북, 6 업로드). 실측 메시지: "제목이 너무 깁니다", "썸네일을 업로드해주세요", "외부 이미지 썸네일은 사용 불가능합니다", "프롬프트를 입력해주세요", "태그가 너무 많습니다", "사용 불가능한 변수가 사용되었습니다", "변수 개수가 일치하지 않습니다", "외부 이미지가 감지되었습니다", "중복되는 이미지 이름은 사용 불가능합니다", "응답 형식이 올바르지 않습니다"(필드 모양 오류). 시네마 불가 모델은 404.
+- **서버가 막지 않는 것**: 시작 세션 0개, 위험한 정규식 매크로(실행 때 건너뜀), 없는 모델 ID. 도구가 올리기 전에 막는다.
+- 저장 형식: 매크로는 늘 `type·from·to·prefix·suffix` 다섯 칸, 로어북 트리거는 늘 아홉 칸이고 정규식 트리거의 패턴은 `keyword` 칸에 들어간다. 도구가 바꿔 올리고 `pull`이 되돌린다.
+- 시네마챗 템플릿 사본의 `templateId`는 서버가 늘 `"none"`으로 저장하고, `rawCharacter.tags`는 저장하지 않는다. 저장본 대조는 이 둘을 차이로 보지 않는다.
+
 ## 파일
 
 | 경로 | 역할 |
@@ -280,15 +353,18 @@ comet preview template.json -o out.png \
 | `comet_tpl/dsl.py` | DSL ↔ 노드 JSON, 문맥 규칙, 구조 검사 |
 | `comet_tpl/pyc.py` | Python 부분집합 → 블록 컴파일러, 블록 → Python 출력기 |
 | `comet_tpl/regex.py` | 정규식 위험 판정(safe-regex 2.1.1 이식)·JS 문법, node 실행기(매크로 엔진·`{user}` 보정), 범위·단어·이미지 매크로 생성, 매크로·로어북 JSON 검사 |
-| `comet_tpl/spec.py` | 스펙 ↔ 페이로드, 제한·참조 검사, 경고 |
+| `comet_tpl/spec.py` | 템플릿 스펙 ↔ 페이로드, 제한·참조 검사, 경고 |
+| `comet_tpl/works.py` | 노벨챗·시네마챗 스펙 ↔ 페이로드, 제한·프로 모드 판정, 로어북 저장 형식 변환, 템플릿 사본·이미지 이름 검사, 저장본 대조 |
 | `comet_tpl/api.py` | HTTP(세션 갱신·재시도), 업로드 캐시, 템플릿 CRUD |
 | `comet_tpl/auth.py` | 크롬 프로필 복사본 + 헤드리스 CDP로 세션 꺼내기(표준 라이브러리 웹소켓) |
 | `comet_tpl/render.py` | 해석기·렌더러 이식, 클릭 라우팅 |
 | `comet_tpl/assets.py` | UI 소재 PNG |
 | `examples/vn-dialogue/` | 완성 예제(DSL): `template.json`, `assets/`, 미리보기용 `sample/`, `thumb.png` |
 | `examples/vn-dialogue-py/` | 같은 템플릿의 Python판: 한 줄 스크립트는 스펙에, 상태창 로직은 `logic.py` |
+| `examples/novel-basic/` | 노벨챗 예제: 표정 이미지 2장, 상태창 체인 매크로, 정규식·턴 로어북 |
+| `examples/cinema-basic/` | 시네마챗 예제: `vn-dialogue` 템플릿, 이미지 이름 3개, 기본값·인트로 로그, 로어북 |
 | `RULES.md` · `GUIDE.md` | Python 규칙서 · 제작 가이드 |
-| `tests/test_core.py` · `test_pyc.py` · `test_regex.py` | 오프라인 테스트(각 파일을 `python3`로 실행). regex의 node 테스트는 node 없으면 건너뜀. 공식 기본 템플릿 픽스처 |
+| `tests/test_core.py` · `test_pyc.py` · `test_regex.py` · `test_setup.py` · `test_works.py` | 오프라인 테스트(각 파일을 `python3`로 실행). regex의 node 테스트는 node 없으면 건너뜀. 공식 기본 템플릿 픽스처 |
 | `~/.config/comet-template/` (`COMET_CONFIG_DIR`) | `config.json`(설정), `session.json`(세션, 600), `uploads.json`(파일 해시 → URL) |
 | `~/.cache/comet-template/img/` | 미리보기용 이미지 캐시 |
 

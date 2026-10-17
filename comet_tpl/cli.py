@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 
-from . import api, config, dsl, pyc, regex as R, spec as S
+from . import api, config, dsl, pyc, regex as R, spec as S, works as W
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -43,6 +43,82 @@ def _local_payload(spec_path: str):
 def _print_report(rep: S.Report):
     print(rep.text())
     print(f"— 오류 {len(rep.errors)} · 경고 {len(rep.warnings)}")
+
+
+def _kind(sp: dict) -> str:
+    k = sp.get("kind", "template")
+    if k not in ("template", *W.KINDS):
+        sys.exit(f"✗ kind는 template|novel|cinema ('{k}')")
+    return k
+
+
+SESSION_TEMPLATE_KEYS = ("variables", "sprites", "imageStorage", "audioStorage", "triggers")
+
+
+def _local_template(path: str) -> tuple[dict, S.Report]:
+    """A local template spec compiled offline into the sessionTemplate shape a cinema chat stores."""
+    payload, rep = S.build_payload(_load(path), None, os.path.dirname(os.path.abspath(path)))
+    side = _sidecar(path)
+    tid = _load(side).get("templateId") if os.path.exists(side) else "none"
+    raw = payload["rawTemplate"]
+    return {"templateId": tid, **{k: raw[k] for k in SESSION_TEMPLATE_KEYS}}, rep
+
+
+def _own_session_template(c: "api.Client", tid: str) -> dict:
+    own = c.own_templates()
+    for t in own:
+        if t["sessionTemplate"].get("templateId") == tid:
+            return t["sessionTemplate"]
+    sys.exit(f"✗ 템플릿 {tid}를 쓸 수 없습니다(내 템플릿·보유 템플릿에 없음). 쓸 수 있는 것:\n"
+             + "\n".join(f"  {t['sessionTemplate'].get('templateId')}  {t['title']}" for t in own))
+
+
+def _cinema_template(sp: dict, base: str, c: "api.Client | None" = None, cid: str | None = None):
+    """(sessionTemplate or None, Report of a local template). Online (c given) the server copy wins."""
+    mode, ref = W.template_ref(sp, base)
+    trep = S.Report()
+    if mode == "file":
+        if not os.path.exists(ref):
+            trep.err("template", f"템플릿 스펙이 없습니다: {ref}")
+            return None, trep
+        st, trep = _local_template(ref)
+        if c is None:
+            return st, trep
+        if st["templateId"] == "none":
+            sys.exit(f"✗ 템플릿을 먼저 올리세요: comet upload {os.path.relpath(ref)}")
+        return _own_session_template(c, st["templateId"]), trep
+    if mode == "id":
+        return (_own_session_template(c, ref) if c else None), trep
+    if c is None:
+        return None, trep
+    if not cid:
+        sys.exit("✗ 새 시네마챗에는 \"template\"이 필요합니다(템플릿 스펙 경로 또는 템플릿 ID, `comet list --own`)")
+    return c.post_work("cinema", cid)["postCharacter"]["rawCharacter"]["sessionTemplate"], trep
+
+
+def _build_work(kind: str, sp: dict, base: str, resolve=None, c=None, cid=None):
+    if kind == "novel":
+        return W.build_novel(sp, resolve, base)
+    st, trep = _cinema_template(sp, base, c, cid)
+    payload, rep = W.build_cinema(sp, st, resolve, base)
+    rep.errors[:0] = [f"template › {e}" for e in trep.errors]
+    return payload, rep
+
+
+def _resolver(c: "api.Client", work: str):
+    """Uploads local files once (content-hash cache) and records what went up."""
+    uploaded = []
+
+    def resolve(p, kind, where):
+        if p.startswith(("http://", "https://")):
+            return p
+        if kind == "thumbnail":
+            p = _thumb_ready(p, work)
+            kind = "image"
+        url = c.upload_file(p, kind)
+        uploaded.append((where, os.path.basename(p), url + ("  (같은 파일, 캐시 재사용)" if c.last_cached else "")))
+        return url
+    return resolve, uploaded
 
 
 # ---------------------------------------------------------------- commands
@@ -100,8 +176,24 @@ def cmd_whoami(a):
     print(f"{u.get('email')}  id={u.get('id')}")
 
 
+def cmd_models(a):
+    rows = api.Client().models()
+    print("모델 ID                         시네마  프로  이름")
+    for m in rows:
+        print(f"{m.get('model', ''):<31} {'○' if m.get('canCinema') else '·':^5} {'○' if m.get('proBudget') else '·':^4}  "
+              f"{m.get('modelName', '')}" + ("  (로그 제공 동의 필요)" if m.get("needAllowLog") else ""))
+
+
 def cmd_list(a):
     c = api.Client()
+    if a.kind != "template":
+        rows = c.my_works(a.kind)
+        if not rows:
+            print(f"(올린 {W.KINDS[a.kind]['label']} 없음)")
+        for t in rows:
+            print(f"{t[W.KINDS[a.kind]['id_key']]}  [{t.get('visibility')}]  {t.get('title')}  "
+                  f"세션 {t.get('sessionCount', 0)} · 채팅 {t.get('chatCount', 0)} · ♥{t.get('likeCount', 0)}")
+        return
     if a.own:
         for i, t in enumerate(c.own_templates()):
             st = t["sessionTemplate"]
@@ -114,8 +206,31 @@ def cmd_list(a):
         print(f"{t['templateId']}  [{t['visibility']}]  {t['title']}  ♥{t.get('likeCount', 0)} 구매 {t.get('purchaseCount', 0)}")
 
 
+def _pull_work(a, c):
+    k = W.KINDS[a.kind]
+    got = c.post_work(a.kind, a.id)
+    post = got[k["post_key"]]
+    if a.raw:
+        return _dump(got, a.output)
+    if not a.output:
+        sys.exit("pull --kind novel|cinema는 -o 스펙 경로가 필요합니다(긴 글·목록은 옆 파일로 씀)")
+    out_dir = os.path.dirname(os.path.abspath(a.output))
+    os.makedirs(out_dir, exist_ok=True)
+    sp = W.post_to_spec(a.kind, post, out_dir)
+    _dump(sp, a.output)
+    with open(_sidecar(a.output), "w", encoding="utf-8") as f:
+        json.dump({"kind": a.kind, "id": a.id, "pulled_at": time.strftime("%Y-%m-%d %H:%M:%S"), **W.links(a.kind, a.id)},
+                  f, ensure_ascii=False, indent=1)
+    if got.get("blockReason"):
+        print(f"△ 제재 사유: {got['blockReason']}")
+
+
 def cmd_pull(a):
     c = api.Client()
+    if a.kind != "template":
+        if not a.id:
+            sys.exit(f"pull --kind {a.kind}: id가 필요합니다(`comet list --kind {a.kind}`)")
+        return _pull_work(a, c)
     if a.own is not None:
         t = c.own_templates()[a.own]
         post = {"title": t["title"], "thumbnail": t["thumbnail"], "rawTemplate": t["sessionTemplate"]}
@@ -149,6 +264,12 @@ def cmd_pull(a):
 
 
 def cmd_check(a):
+    sp = _load(a.spec)
+    kind = _kind(sp)
+    if kind != "template":
+        _, rep = _build_work(kind, sp, os.path.dirname(os.path.abspath(a.spec)))
+        _print_report(rep)
+        sys.exit(1 if rep.errors or (a.strict and rep.warnings) else 0)
     payload, rep = _local_payload(a.spec)
     raw_errs = S.check_raw(payload["rawTemplate"])
     for e in raw_errs:
@@ -169,27 +290,70 @@ def cmd_check(a):
 
 
 def cmd_build(a):
-    payload, rep = _local_payload(a.spec)
+    sp = _load(a.spec)
+    kind = _kind(sp)
+    if kind != "template":
+        payload, rep = _build_work(kind, sp, os.path.dirname(os.path.abspath(a.spec)))
+    else:
+        payload, rep = _local_payload(a.spec)
     _print_report(rep)
     _dump(payload, a.output)
     sys.exit(1 if rep.errors else 0)
+
+
+def _cinema_preview(a, sp: dict):
+    """Template of a cinema spec + the screen a player first sees: defaults, then intro logs up to the
+    first one that stops auto-advance (or exactly --log N), frames fed from the spec's images."""
+    base = os.path.dirname(os.path.abspath(a.spec))
+    st, trep = _cinema_template(sp, base)
+    if st is None:
+        side = _sidecar(a.spec)
+        cid = _load(side).get("id") if os.path.exists(side) else None
+        st, trep = _cinema_template(sp, base, api.Client(), cid)
+    payload, rep = W.build_cinema(sp, st, None, base)
+    rep.errors[:0] = [f"template › {e}" for e in trep.errors]
+    sessions = payload["rawCharacter"]["startSessions"]
+    if not sessions:
+        return st, rep, {}, {}
+    s = sessions[min(a.session, len(sessions) - 1)]
+    names = [v["varName"] for v in st["variables"]]
+    auto = {v["varName"]: v.get("isAuto") for v in st["variables"]}
+    values = {n: v for n, v in zip(names, s["initSession"]) if v != ""}
+    shown = 0
+    for i, lg in enumerate(s["logs"]):
+        if a.log is not None and i >= a.log:
+            break
+        values[lg["varName"]] = lg["value"]
+        shown = i + 1
+        if a.log is None and not auto.get(lg["varName"]):
+            break
+    print(f"시작 세션 '{s['sessionTitle']}': 기본값 + 인트로 로그 {shown}/{len(s['logs'])}개")
+    images = {}
+    for name, v in (sp.get("images") or {}).items():
+        src = v if isinstance(v, str) else (v or {}).get("src", "")
+        images[name] = src if src.startswith(("http://", "https://")) else os.path.join(base, src)
+    return st, rep, values, images
 
 
 def _resolve_preview_target(a):
     if a.id:
         c = api.Client()
         post = c.post_template(a.id)
-        return post["rawTemplate"], S.Report()
+        return post["rawTemplate"], S.Report(), {}, {}
     data = _load(a.spec)
     if "rawTemplate" in data:
-        return data["rawTemplate"], S.Report()
+        return data["rawTemplate"], S.Report(), {}, {}
+    if data.get("kind") == "cinema":
+        return _cinema_preview(a, data)
+    if data.get("kind") == "novel":
+        sys.exit("✗ 노벨챗은 그림 미리보기가 없습니다. `comet macro test`로 출력이 화면 직전 글로 바뀌는 과정을 봅니다")
     payload, rep = S.build_payload(data, None, os.path.dirname(os.path.abspath(a.spec)))
-    return payload["rawTemplate"], rep
+    return payload["rawTemplate"], rep, {}, {}
 
 
 def cmd_preview(a):
     from . import render
-    raw, rep = _resolve_preview_target(a)
+    raw, rep, values, spec_images = _resolve_preview_target(a)
     if rep.errors:
         _print_report(rep)
         sys.exit(1)
@@ -197,7 +361,7 @@ def cmd_preview(a):
     names = {}
     for si, s in enumerate(raw["sprites"]):
         names.setdefault(s.get("objectName"), []).append(si)
-    values = dict(kv.split("=", 1) for kv in a.set)
+    values.update(dict(kv.split("=", 1) for kv in a.set))
     now = a.now
     for kv in a.ago:
         k, ms = kv.split("=", 1)
@@ -216,7 +380,7 @@ def cmd_preview(a):
             events.append(f"click:{si}")
         else:
             events.append(ev)
-    char_images = dict(kv.split("=", 1) for kv in a.char_image)
+    char_images = {**spec_images, **dict(kv.split("=", 1) for kv in a.char_image)}
     out = a.output or os.path.join(tempfile.gettempdir(), "comet-preview.png")
     res = render.render(raw, values, now=now, after=a.after, mouse=tuple(a.mouse), first=a.pos == "first", last=a.pos != "middle" and a.pos != "first",
                         events=events, char_images=char_images, username=a.username or config.get("username"), font=a.font, boxes=a.boxes, out=out,
@@ -256,12 +420,76 @@ def _thumb_ready(path: str, workdir: str) -> str:
     return out
 
 
+def _upload_work(a, sp: dict, spec_path: str, kind: str):
+    k = W.KINDS[kind]
+    base = os.path.dirname(spec_path)
+    side = _sidecar(spec_path)
+    cid = a.id
+    if not cid and not a.new and os.path.exists(side):
+        meta = _load(side)
+        cid = meta.get("id") if meta.get("kind") == kind else None
+    if a.dry_run:
+        payload, rep = _build_work(kind, sp, base)
+        print(rep.text())
+        print(f"(dry-run) {'수정 ' + cid if cid else '새로 만들기'} · {k['label']}")
+        return _dump(payload, a.output)
+    payload, rep = _build_work(kind, sp, base)   # offline pass first: nothing goes up if the spec is broken
+    if rep.errors:
+        _print_report(rep)
+        sys.exit("✗ 오류가 있어 올리지 않았습니다")
+    c = api.Client()
+    if cid and cid not in {t[k["id_key"]] for t in c.my_works(kind)}:
+        print(f"△ {cid}는 내 {k['label']} 목록에 없어 새로 만듭니다")
+        cid = None
+    models = {m.get("model"): m for m in c.models()}
+    model = payload["defaultModel"]
+    if model not in models or (kind == "cinema" and not models[model].get("canCinema")):
+        usable = [m for m, d in models.items() if kind != "cinema" or d.get("canCinema")]
+        sys.exit(f"✗ defaultModel '{model}'은 {k['label']}에 쓸 수 없습니다. 쓸 수 있는 모델: {', '.join(usable)}")
+    work = tempfile.mkdtemp(prefix="comet-up-")
+    try:
+        resolve, uploaded = _resolver(c, work)
+        payload, rep = _build_work(kind, sp, base, resolve, c, cid)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    if rep.errors:
+        _print_report(rep)
+        sys.exit(1)
+    if rep.warnings:
+        print(rep.text())
+    for where, name, url in uploaded:
+        print(f"  ↑ {where}: {name} → {url}")
+    try:
+        if cid:
+            c.update_work(kind, cid, payload)
+            action = "수정"
+        else:
+            cid = c.create_work(kind, payload)
+            action = "등록"
+    except api.ApiError as e:
+        sys.exit(f"✗ 서버 거부 — {e}")
+    ln = W.links(kind, cid)
+    with open(side, "w", encoding="utf-8") as f:
+        json.dump({"kind": kind, "id": cid, "title": payload["title"], "uploaded_at": time.strftime("%Y-%m-%d %H:%M:%S"), **ln},
+                  f, ensure_ascii=False, indent=1)
+    got = c.post_work(kind, cid)
+    diffs = W.diff(kind, payload, got[k["post_key"]])
+    print(f"✓ {k['label']} {action}: {payload['title']} ({payload['visibility']})  id={cid}")
+    print(f"  편집 {ln['edit']}\n  상세 {ln['detail']}")
+    print("  저장본 대조: " + ("보낸 그대로 ✓" if not diffs else f"서버가 바꾼 칸 {diffs} — `comet pull --kind {kind} {cid} --raw`로 확인"))
+    if got.get("blockReason"):
+        print(f"  △ 제재 사유: {got['blockReason']}")
+
+
 def cmd_upload(a):
     spec_path = os.path.abspath(a.spec)
     base = os.path.dirname(spec_path)
     sp = _load(spec_path)
     if a.public:
         sp["visibility"] = "public"
+    kind = _kind(sp)
+    if kind != "template":
+        return _upload_work(a, sp, spec_path, kind)
     payload, rep = S.build_payload(sp, None, base)
     if rep.errors:
         _print_report(rep)
@@ -278,18 +506,7 @@ def cmd_upload(a):
     c = api.Client()
     work = tempfile.mkdtemp(prefix="comet-up-")
     try:
-        uploaded = []
-
-        def resolve(p, kind, where):
-            if p.startswith(("http://", "https://")):
-                return p
-            if kind == "thumbnail":
-                p = _thumb_ready(p, work)
-                kind = "image"
-            url = c.upload_file(p, kind)
-            uploaded.append((where, os.path.basename(p), url + ("  (같은 파일, 캐시 재사용)" if c.last_cached else "")))
-            return url
-
+        resolve, uploaded = _resolver(c, work)
         payload, rep = S.build_payload(sp, resolve, base)
         if rep.errors:
             _print_report(rep)
@@ -326,6 +543,17 @@ def cmd_upload(a):
 
 def cmd_delete(a):
     c = api.Client()
+    if a.kind != "template":
+        k = W.KINDS[a.kind]
+        mine = {t[k["id_key"]]: t for t in c.my_works(a.kind)}
+        if a.id not in mine:
+            sys.exit(f"✗ {a.id}는 내 {k['label']}이 아닙니다")
+        t = mine[a.id]
+        if not a.yes:
+            sys.exit(f"'{t['title']}'(세션 {t.get('sessionCount', 0)}·채팅 {t.get('chatCount', 0)})를 지우려면 --yes를 붙이세요(되돌릴 수 없음)")
+        c.delete_work(a.kind, a.id)
+        print(f"✓ 삭제: {t['title']} ({a.id})")
+        return
     mine = {t["templateId"]: t for t in c.my_templates()}
     if a.id not in mine:
         sys.exit(f"✗ {a.id}는 내 템플릿이 아닙니다")
@@ -357,8 +585,20 @@ def cmd_new(a):
         sys.exit(f"예제 없음: {a.example} (있는 것: {', '.join(sorted(os.listdir(os.path.join(HERE, 'examples'))))})")
     if os.path.exists(a.dir) and os.listdir(a.dir):
         sys.exit(f"{a.dir}가 비어 있지 않습니다")
-    shutil.copytree(src, a.dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.comet.json", "__pycache__"))
-    print(f"→ {a.dir}  (spec: {os.path.join(a.dir, 'template.json')})")
+    skip = shutil.ignore_patterns("*.comet.json", "__pycache__")
+    shutil.copytree(src, a.dir, dirs_exist_ok=True, ignore=skip)
+    spec = next((n for n in ("template.json", "novel.json", "cinema.json") if os.path.exists(os.path.join(a.dir, n))), "")
+    if spec == "cinema.json":
+        # the example points at a sibling template; give the copy its own template folder instead
+        cpath = os.path.join(a.dir, spec)
+        sp = _load(cpath)
+        mode, ref = W.template_ref(sp, src)
+        if mode == "file" and os.path.isdir(os.path.dirname(ref)):
+            shutil.copytree(os.path.dirname(ref), os.path.join(a.dir, "template"), ignore=skip)
+            sp["template"] = "template/" + os.path.basename(ref)
+            _dump(sp, cpath)
+            print(f"  템플릿: {os.path.join(a.dir, 'template')} — 먼저 `comet upload {os.path.join(a.dir, sp['template'])}`")
+    print(f"→ {a.dir}  (spec: {os.path.join(a.dir, spec)})")
 
 
 def cmd_py(a):
@@ -468,6 +708,13 @@ def cmd_regex(a):
 
 def cmd_macro(a):
     data = _load(a.file)
+    if isinstance(data, dict) and data.get("kind") == "novel":
+        # a novel spec: run the macro list exactly as it will be stored (image macros first)
+        payload, rep = W.build_novel(data, None, os.path.dirname(os.path.abspath(a.file)))
+        if rep.errors:
+            _print_report(rep)
+        data = [{k: m[k] for k in (("type", "from", "prefix", "suffix") if m["type"] == "regex_regex" else ("type", "from", "to"))}
+                for m in payload["rawNovel"]["macros"]]
     if a.op == "check":
         errs, warns = R.check_macros(data)
         for e in errs:
@@ -553,19 +800,21 @@ def main(argv=None):
     s = sub.add_parser("whoami", help="현재 세션의 계정")
     s.set_defaults(fn=cmd_whoami)
 
-    s = sub.add_parser("list", help="내가 올린 템플릿(--own: 시네마챗에 쓸 수 있는 템플릿)")
+    s = sub.add_parser("list", help="내가 올린 템플릿·노벨챗·시네마챗(--own: 시네마챗에 쓸 수 있는 템플릿)")
     s.add_argument("--own", action="store_true")
+    s.add_argument("--kind", choices=["template", "novel", "cinema"], default="template", help="template | novel(노벨챗) | cinema(시네마챗)")
     s.set_defaults(fn=cmd_list)
 
-    s = sub.add_parser("pull", help="템플릿을 내려받아 스펙으로 풀기")
+    s = sub.add_parser("pull", help="템플릿·노벨챗·시네마챗을 내려받아 스펙으로 풀기")
     s.add_argument("id", nargs="?")
+    s.add_argument("--kind", choices=["template", "novel", "cinema"], default="template", help="template | novel(노벨챗) | cinema(시네마챗)")
     s.add_argument("--own", type=int, help="list --own의 번호")
     s.add_argument("-o", "--output")
     s.add_argument("--raw", action="store_true", help="플랫폼 JSON 그대로")
     s.add_argument("--lang", choices=["cs", "py"], default="cs", help="py: 스크립트를 옆의 logic.py(Python)로")
     s.set_defaults(fn=cmd_pull)
 
-    s = sub.add_parser("check", help="스펙 검사(오프라인)")
+    s = sub.add_parser("check", help="스펙 검사(오프라인). 스펙의 kind로 템플릿·노벨챗·시네마챗을 가름")
     s.add_argument("spec")
     s.add_argument("--strict", action="store_true", help="경고도 실패로")
     s.add_argument("--show", action="store_true", help="스크립트를 정규형으로 다시 출력")
@@ -592,9 +841,14 @@ def main(argv=None):
     s.add_argument("--font")
     s.add_argument("--boxes", action="store_true", help="레이어 테두리와 번호 표시")
     s.add_argument("--scale", type=float, default=1.0)
+    s.add_argument("--session", type=int, default=0, help="시네마챗 스펙: 시작 세션 번호(0부터)")
+    s.add_argument("--log", type=int, help="시네마챗 스펙: 인트로 로그를 정확히 N개 적용(기본: 첫 비자동 로그까지)")
     s.set_defaults(fn=cmd_preview)
 
-    s = sub.add_parser("upload", help="검사 → 파일 업로드 → 등록/수정 → 저장본 대조")
+    s = sub.add_parser("models", help="기본 모델로 고를 수 있는 모델 ID(시네마챗 가능 여부)")
+    s.set_defaults(fn=cmd_models)
+
+    s = sub.add_parser("upload", help="템플릿·노벨챗·시네마챗 스펙: 검사 → 파일 업로드 → 등록/수정 → 저장본 대조")
     s.add_argument("spec")
     s.add_argument("--id", help="이 템플릿을 수정")
     s.add_argument("--new", action="store_true", help="사이드카 ID를 무시하고 새로 등록")
@@ -603,8 +857,9 @@ def main(argv=None):
     s.add_argument("-o", "--output", help="--dry-run 페이로드 저장")
     s.set_defaults(fn=cmd_upload)
 
-    s = sub.add_parser("delete", help="내 템플릿 삭제")
+    s = sub.add_parser("delete", help="내 템플릿·노벨챗·시네마챗 삭제")
     s.add_argument("id")
+    s.add_argument("--kind", choices=["template", "novel", "cinema"], default="template", help="template | novel(노벨챗) | cinema(시네마챗)")
     s.add_argument("--yes", action="store_true")
     s.set_defaults(fn=cmd_delete)
 
@@ -628,7 +883,7 @@ def main(argv=None):
 
     s = sub.add_parser("new", help="예제에서 새 템플릿 폴더 만들기")
     s.add_argument("dir")
-    s.add_argument("--example", default="vn-dialogue")
+    s.add_argument("--example", default="vn-dialogue", help="vn-dialogue | vn-dialogue-py | novel-basic | cinema-basic")
     s.set_defaults(fn=cmd_new)
 
     s = sub.add_parser("py", help="Python 스크립트 조각 → 코멧 블록(무엇으로 바뀌는지 확인)")

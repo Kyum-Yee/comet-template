@@ -1,0 +1,5 @@
+[
+ {"type": "regex_regex", "from": "```info\\n?([\\s\\S]*?)\\n?```", "prefix": "<blockquote>", "suffix": "</blockquote>"},
+ {"type": "regex_str", "from": "\\n", "to": "<br>"},
+ {"type": "regex_str", "from": "\\{\\{\\s*img::[^}]*\\}\\}", "to": ""}
+]

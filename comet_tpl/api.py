@@ -11,6 +11,12 @@ Endpoints (observed in the site bundle and verified live, 2026-10-16):
   GET  /get/ownTemplate                templates usable in cinema chats (owned + bought)
   GET  /get/detail/template/{id}       public detail page data
   POST /delete/template/{id}
+  POST /upload/newnovel · /upload/novel/{id}          novel chat, same reply rules as templates
+  POST /upload/newcharacter · /upload/character/{id}  cinema chat ("character")
+  GET  /get/mynovel · /get/mycharacter                own lists (novelId / characterId)
+  GET  /get/postNovel/{id} · /get/postCharacter/{id}  editable post + allowedAt, blockReason
+  POST /delete/novel/{id} · /delete/character/{id}
+  GET  /get/modeldata                                 models; canCinema marks cinema-capable ones
 """
 from __future__ import annotations
 
@@ -23,6 +29,7 @@ import urllib.error
 import urllib.request
 import uuid
 
+from . import works
 from .config import CONFIG_DIR
 
 API = "https://api.comet-talk.ai"
@@ -201,6 +208,35 @@ class Client:
 
     def delete_template(self, tid: str):
         self.request("POST", f"/delete/template/{tid}")
+
+    # -- novel / cinema chats (kind: "novel" | "cinema"; the platform names a cinema chat "character")
+    def models(self) -> list[dict]:
+        return self.get("/get/modeldata").get("data", [])
+
+    def my_works(self, kind: str) -> list[dict]:
+        k = works.KINDS[kind]
+        return self.get(k["mine"]).get(k["mine_key"], [])
+
+    def post_work(self, kind: str, cid: str) -> dict:
+        """{postNovel|postCharacter, allowedAt, blockReason}"""
+        return self.get(works.KINDS[kind]["post"].format(id=cid))
+
+    def create_work(self, kind: str, payload: dict) -> str:
+        k = works.KINDS[kind]
+        before = {t[k["id_key"]] for t in self.my_works(kind)}
+        self.post_json(k["new"], payload)
+        for _ in range(5):
+            new = [t for t in self.my_works(kind) if t[k["id_key"]] not in before]
+            if new:
+                return new[0][k["id_key"]]
+            time.sleep(1)
+        raise ApiError(0, f"업로드는 성공했지만 새 {k['label']} ID를 찾지 못했습니다({k['mine']} 확인)")
+
+    def update_work(self, kind: str, cid: str, payload: dict):
+        self.post_json(works.KINDS[kind]["edit"].format(id=cid), payload)
+
+    def delete_work(self, kind: str, cid: str):
+        self.request("POST", works.KINDS[kind]["delete"].format(id=cid))
 
 
 def _load_cache() -> dict:
