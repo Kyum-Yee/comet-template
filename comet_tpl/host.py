@@ -72,7 +72,8 @@ export default {
     const out = new Response(res.body, res);
     for (const [k, v] of Object.entries(CORS)) out.headers.set(k, v);
     out.headers.set("Accept-Ranges", "bytes");
-    if (res.ok) out.headers.set("Cache-Control", "public, max-age=86400");
+    // An hour, not a day: a replaced image (same name, new picture) reaches viewers within the hour.
+    if (res.ok) out.headers.set("Cache-Control", "public, max-age=3600");
     return out;
   },
 };
