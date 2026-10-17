@@ -1,0 +1,253 @@
+{
+  "title": "비주얼노벨 대사창",
+  "description": "배경·인물·이름표·대사·상태창을 갖춘 비주얼노벨형 시네마챗 템플릿입니다.\n\n[시네마챗 제작자 안내]\n- 이미지 탭에 배경과 인물 이미지를 등록하고, 이미지 이름이 AI가 쓰는 값이 됩니다. 예: 배경 '도서관_낮', 인물 '린_미소'.\n- 시작 세션 기본값에 배경·인물 이미지 이름을 넣어 두면 첫 화면이 비지 않습니다.\n- 상태창은 AI가 '상태' 변수에 쓰는 한 줄 요약을 보여 줍니다(관계, 장소, 시간 등).\n\n[조작]\n- 화면 아무 곳이나 터치, →, Space, Enter: 다음\n- ← 또는 좌측 화살표 버튼: 이전\n- 오른쪽 위 메뉴 버튼 또는 S: 상태창 열기/닫기, Esc 또는 바깥 터치: 닫기",
+  "visibility": "private",
+  "thumbnail": "thumb.png",
+  "prompt": "## 변수\n- 배경: 장면 배경 이미지 이름. 장소나 시간이 바뀔 때만 바꾼다.\n- 인물: 화면 가운데 선 인물 이미지 이름. 말하는 사람이나 표정이 바뀔 때 바꾼다. 아무도 없으면 빈 값.\n- 이름: 지금 말하는 사람 이름. 나레이션이면 빈 값.\n- 대사: 대사 한 마디 또는 나레이션 한 문장. 나레이션·행동은 *별표*로 감싼다.\n- 상태: 상태창에 보일 요약(관계·장소·시간). 크게 달라질 때만 갱신.\n\n## 동시에 바꿀 때 순서\n1. 배경 2. 인물 3. 이름 4. 상태 5. 대사\n배경·인물·이름·상태는 자동 넘기기라 뒤따르는 대사와 한 번에 보인다. 대사 로그 하나에는 한 문장만 담는다.",
+  "variables": [
+    {
+      "name": "배경",
+      "kind": "global",
+      "type": "string",
+      "auto": true
+    },
+    {
+      "name": "인물",
+      "kind": "global",
+      "type": "string",
+      "auto": true
+    },
+    {
+      "name": "이름",
+      "kind": "global",
+      "type": "string",
+      "auto": true
+    },
+    {
+      "name": "대사",
+      "kind": "global",
+      "type": "string",
+      "auto": false
+    },
+    {
+      "name": "상태",
+      "kind": "global",
+      "type": "string",
+      "auto": true
+    },
+    {
+      "name": "창열림",
+      "kind": "system"
+    },
+    {
+      "name": "창시간",
+      "kind": "system"
+    }
+  ],
+  "images": {},
+  "audio": {},
+  "scripts": "logic.py",
+  "layers": [
+    {
+      "type": "frame",
+      "name": "배경",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720,
+      "objectFit": "cover",
+      "moping": "cross-fade",
+      "duration": 500,
+      "value": "배경"
+    },
+    {
+      "type": "frame",
+      "name": "인물",
+      "x": 390,
+      "y": 40,
+      "width": 500,
+      "height": 680,
+      "objectFit": "contain",
+      "moping": "fade",
+      "duration": 300,
+      "value": "인물"
+    },
+    {
+      "type": "image",
+      "name": "화면 터치",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720,
+      "src": "assets/hit.png",
+      "note": "투명 PNG. 클릭은 위쪽 레이어부터 판정하므로 맨 아래 클릭 레이어로 두면 버튼이 먼저 받는다",
+      "action": "next()"
+    },
+    {
+      "type": "image",
+      "name": "대사창",
+      "x": 40,
+      "y": 490,
+      "width": 1200,
+      "height": 210,
+      "src": "assets/dialogue.png"
+    },
+    {
+      "type": "image",
+      "name": "이름표",
+      "x": 70,
+      "y": 466,
+      "width": 220,
+      "height": 48,
+      "src": "assets/nameplate.png",
+      "state": "if 이름 == \"\":\n    hide()"
+    },
+    {
+      "type": "text",
+      "name": "이름",
+      "x": 70,
+      "y": 470,
+      "width": 220,
+      "height": 44,
+      "fontFamily": "경기천년제목",
+      "fontSize": 26,
+      "fontWeight": 500,
+      "color": "#FFD27A",
+      "textAlign": "center",
+      "easing": "none",
+      "overflow": "hidden",
+      "whiteSpace": "normal",
+      "value": "이름",
+      "state": "if 이름 == \"\":\n    hide()"
+    },
+    {
+      "type": "text",
+      "name": "대사",
+      "x": 100,
+      "y": 530,
+      "width": 960,
+      "height": 150,
+      "fontFamily": "Pretendard",
+      "fontSize": 30,
+      "fontWeight": 500,
+      "color": "#FFFFFF",
+      "textAlign": "left",
+      "easing": "typing",
+      "overflow": "scroll",
+      "whiteSpace": "pre-wrap",
+      "value": "대사"
+    },
+    {
+      "type": "image",
+      "name": "입력 배경",
+      "x": 260,
+      "y": 24,
+      "width": 760,
+      "height": 44,
+      "src": "assets/pill.png",
+      "state": "if 유저_입력 == \"\":\n    hide()"
+    },
+    {
+      "type": "text",
+      "name": "유저 입력",
+      "x": 280,
+      "y": 28,
+      "width": 720,
+      "height": 40,
+      "fontFamily": "Pretendard",
+      "fontSize": 22,
+      "fontWeight": 400,
+      "color": "#FFFFFFCC",
+      "textAlign": "center",
+      "easing": "none",
+      "overflow": "hidden",
+      "whiteSpace": "normal",
+      "value": "유저_입력",
+      "state": "if 유저_입력 == \"\":\n    hide()"
+    },
+    {
+      "type": "image",
+      "name": "이전",
+      "x": 1068,
+      "y": 612,
+      "width": 88,
+      "height": 88,
+      "src": "assets/prev.png",
+      "action": "prev()",
+      "state": "if is_first:\n    self.opacity = 0.35"
+    },
+    {
+      "type": "image",
+      "name": "다음",
+      "x": 1146,
+      "y": 612,
+      "width": 88,
+      "height": 88,
+      "src": "assets/next.png",
+      "action": "next()"
+    },
+    {
+      "type": "image",
+      "name": "상태 버튼",
+      "x": 1184,
+      "y": 16,
+      "width": 80,
+      "height": 80,
+      "src": "assets/menu.png"
+    },
+    {
+      "type": "image",
+      "name": "창 배경막",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720,
+      "src": "assets/dim.png"
+    },
+    {
+      "type": "image",
+      "name": "상태창",
+      "x": 280,
+      "y": 180,
+      "width": 720,
+      "height": 360,
+      "src": "assets/window.png",
+      "note": "NULL이 아닌 action이 있어야 클릭이 아래 배경막(닫기)으로 새지 않는다"
+    },
+    {
+      "type": "text",
+      "name": "상태 제목",
+      "x": 320,
+      "y": 204,
+      "width": 560,
+      "height": 48,
+      "fontFamily": "경기천년제목",
+      "fontSize": 28,
+      "color": "#FFD27A",
+      "textAlign": "left"
+    },
+    {
+      "type": "text",
+      "name": "상태 내용",
+      "x": 320,
+      "y": 262,
+      "width": 640,
+      "height": 250,
+      "fontFamily": "Pretendard",
+      "fontSize": 26,
+      "color": "#E8E8F0",
+      "textAlign": "left",
+      "overflow": "scroll",
+      "whiteSpace": "pre-wrap"
+    },
+    {
+      "type": "image",
+      "name": "닫기",
+      "x": 924,
+      "y": 188,
+      "width": 64,
+      "height": 64,
+      "src": "assets/close.png"
+    }
+  ]
+}

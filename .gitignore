@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+# per-user state: never commit
+session.json
+uploads.json
+config.json
+*.comet.json
+.env*
+.DS_Store
