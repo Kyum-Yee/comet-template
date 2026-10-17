@@ -86,6 +86,21 @@ def test_user_particle_fix_reproduces_site_quirks():
     assert R.run_macros("{user}가 {user}로 가자", [], user="철수")["result"] == "철수가 철수로 가자"
 
 
+def test_re2_flags_what_the_server_ignores_and_only_that():
+    # fails if a lorebook trigger that can never fire on the server (RE2) passes, or if escaped/in-class
+    # look-alikes are flagged and block a valid lorebook
+    assert R.re2_issues("(?<=린)님|(?!x)") == ["뒤보기 (?<=…)", "부정 앞보기 (?!…)"]
+    assert any("역참조" in x for x in R.re2_issues("(a)\\1", 1))
+    assert any("[^]" in x for x in R.re2_issues("[^]*?끝")) and any("1000" in x for x in R.re2_issues("a{2,1001}"))
+    assert R.re2_issues("\\(?=[(?=]\\\\1{3,1000}") == []
+    lb = [{"title": "t", "content": "c", "useDefault": False, "triggers": [
+        {"type": "regex", "action": "apply", "regex": "(대회|결승)(?=전)", "watchPrevChat": True, "watchUserChat": True}]}]
+    errs, _ = R.check_lorebooks(lb)
+    assert len(errs) == 1 and "RE2" in errs[0]
+    lb[0]["triggers"][0]["regex"] = "(대회|결승)전"
+    assert R.check_lorebooks(lb)[0] == []
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

@@ -662,7 +662,8 @@ def cmd_regex(a):
             bad += not st.safe
             rows.append({"pattern": p, "ok": st.ok, "safe": st.safe, "error": st.error, "groups": st.groups,
                          "named": st.named, "repetitions": st.repetitions, "star_height": st.star_height,
-                         "notes": st.notes, "js_checked": js is not None})
+                         "notes": st.notes, "re2": R.re2_issues(_arg_text(p), st.groups) if st.ok else [],
+                         "js_checked": js is not None})
             if not a.json:
                 print(f"{st.verdict()}  {p}")
                 if st.ok:
@@ -670,6 +671,8 @@ def cmd_regex(a):
                           + ("" if js else "  (node 없음: JS 문법은 정적 검사만)"))
                 for n in st.notes:
                     print(f"   · {n}")
+                for x in (R.re2_issues(_arg_text(p), st.groups) if st.ok else []):
+                    print(f"   · 로어북 트리거로 쓰면 서버(RE2)가 무시합니다: {x}")
         if a.json:
             print(json.dumps(rows, ensure_ascii=False, indent=1))
         sys.exit(1 if bad else 0)

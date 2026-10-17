@@ -338,7 +338,8 @@ comet preview template.json -o out.png \
 
 - 엔드포인트: 노벨챗 `POST /upload/newnovel`·`/upload/novel/{id}`, 시네마챗은 플랫폼 이름이 "character"라 `POST /upload/newcharacter`·`/upload/character/{id}`. 목록 `/get/mynovel`·`/get/mycharacter`, 저장본 `/get/postNovel/{id}`·`/get/postCharacter/{id}`, 삭제 `POST /delete/novel|character/{id}`. 링크 `https://comet-talk.ai/build|detail/novel|cinema/<ID>`.
 - 성공은 빈 200, 실패는 400 `{msg, goto}`(goto = 편집기 탭: 1 기본 정보, 2 프롬프트, 3 시작 대화, 4 이미지, 5 로어북, 6 업로드). 실측 메시지: "제목이 너무 깁니다", "썸네일을 업로드해주세요", "외부 이미지 썸네일은 사용 불가능합니다", "프롬프트를 입력해주세요", "태그가 너무 많습니다", "사용 불가능한 변수가 사용되었습니다", "변수 개수가 일치하지 않습니다", "외부 이미지가 감지되었습니다", "중복되는 이미지 이름은 사용 불가능합니다", "응답 형식이 올바르지 않습니다"(필드 모양 오류). 시네마 불가 모델은 404.
-- **서버가 막지 않는 것**: 시작 세션 0개, 위험한 정규식 매크로(실행 때 건너뜀), 없는 모델 ID. 도구가 올리기 전에 막는다.
+- **서버가 막지 않는 것**: 시작 세션 0개, 위험한 정규식 매크로(실행 때 건너뜀), 없는 모델 ID(코멧의 모델 sync가 기본 모델로 바꿈). 도구가 올리기 전에 막는다.
+- 로어북 트리거 정규식은 서버가 RE2로 판정한다(코멧 공식). 앞뒤 보기·역참조·`[^]`·1000 초과 반복은 무시되어 트리거가 발동하지 않으므로 `check`가 오류로 막는다(GUIDE.md 7장).
 - 저장 형식: 매크로는 늘 `type·from·to·prefix·suffix` 다섯 칸, 로어북 트리거는 늘 아홉 칸이고 정규식 트리거의 패턴은 `keyword` 칸에 들어간다. 도구가 바꿔 올리고 `pull`이 되돌린다.
 - 시네마챗 템플릿 사본의 `templateId`는 서버가 늘 `"none"`으로 저장하고, `rawCharacter.tags`는 저장하지 않는다. 저장본 대조는 이 둘을 차이로 보지 않는다.
 

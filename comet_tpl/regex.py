@@ -16,7 +16,9 @@ Facts taken from the site bundle (2026-10-16):
                  receiver and is consumed by the chain (the main pass resumes after it).
 - Render order after macros: {user} (with Korean particle fix) → {turn} → {rand} → markdown-it
   (breaks, html) → **b** / *i* → DOMPurify (no style/script/iframe/object/embed).
-- Lorebook regex triggers: the editor only checks `new RegExp(p)` compiles.
+- Lorebook regex triggers: the editor only checks `new RegExp(p)` compiles; the server matches them
+  with RE2 (Comet, official, 2026-10-17): linear time, so no ReDoS, but no lookaround, no
+  backreference, repeats up to 1000, and a pattern RE2 cannot parse is ignored (the trigger never fires).
 
 This module ports the safety heuristic (verified against safe-regex 2.1.1 in tests), validates and
 runs patterns with node when available (exact JS), and generates range / alternation regexes.
@@ -246,6 +248,50 @@ def _check_ranges(body: str) -> None:
             t += 3
         else:
             t += 1
+
+
+RE2_MAX_REPEAT = 1000
+
+
+def re2_issues(p: str, groups: int = 9) -> list[str]:
+    """JS syntax the server's RE2 engine does not accept. Lorebook regex triggers run there, and a
+    pattern RE2 cannot parse is ignored, so the trigger never fires (Comet, 2026-10-17)."""
+    out, n, i = [], len(p), 0
+    while i < n:
+        c = p[i]
+        if c == "\\" and i + 1 < n:
+            e = p[i + 1]
+            if e in "123456789" and int(e) <= groups:
+                out.append(f"역참조 \\{e}")
+            elif e == "k" and p.startswith("<", i + 2):
+                out.append("이름 역참조 \\k<…>")
+            i += 2
+            continue
+        if c == "[":
+            # JS reads `[^]` (any char) and `[]` (nothing); RE2 reads the `]` as a literal and finds no close
+            for tok in ("[^]", "[]"):
+                if p.startswith(tok, i):
+                    out.append(f"{tok} (RE2는 첫 ] 를 글자로 읽어 집합이 닫히지 않음. 아무 글자는 [\\s\\S])")
+                    i += len(tok)
+                    break
+            else:
+                try:
+                    i = _class_end(p, i)
+                except ValueError:
+                    i = n
+            continue
+        if c == "(":
+            for tok, name in (("(?=", "앞보기 (?=…)"), ("(?!", "부정 앞보기 (?!…)"),
+                              ("(?<=", "뒤보기 (?<=…)"), ("(?<!", "부정 뒤보기 (?<!…)")):
+                if p.startswith(tok, i):
+                    out.append(name)
+                    break
+        if c == "{":
+            m = re.match(r"\{(\d+)(?:,(\d*))?\}", p[i:])
+            if m and max(int(m.group(1)), int(m.group(2) or 0)) > RE2_MAX_REPEAT:
+                out.append(f"반복 횟수 {m.group()} (RE2 최대 {RE2_MAX_REPEAT})")
+        i += 1
+    return list(dict.fromkeys(out))
 
 
 def lint(p: str) -> list[str]:
@@ -543,8 +589,9 @@ def check_lorebooks(data) -> tuple[list[str], list[str]]:
                     st, js = check(v)
                     if not st.ok:
                         errs.append(f"{tw} 정규식 오류: {st.error}")
-                    elif not st.safe:
-                        warns.append(f"{tw} {st.verdict()} — 로어북 검사는 막지 않지만 긴 입력에서 멈출 수 있습니다")
+                    else:
+                        errs += [f"{tw} 서버 정규식 엔진 RE2가 못 읽는 문법: {x} — 편집기는 받지만 서버가 이 정규식을 무시해"
+                                 " 트리거가 발동하지 않습니다" for x in re2_issues(v, st.groups)]
                     warns += [f"{tw} {x}" for x in st.notes if "욕심" not in x]
             else:
                 for key, lo in (("from", 1), ("to", None), ("remainder", 0)) + ((("diceIndex", 1),) if typ == "dice" else ()):
