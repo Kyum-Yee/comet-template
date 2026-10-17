@@ -93,6 +93,13 @@ comet macro test 등대/novel.json @출력예시.txt --user 민준 --trace   # �
 comet lorebook check lore.json
 ```
 
+외부 이미지 호스팅(Cloudflare Workers, 계정과 Node.js 필요):
+
+```bash
+comet host init && comet host add 등대 그림/ && comet host deploy && comet host check
+comet host url 등대 --var 장면                     # 템플릿 프레임에 넣을 value 스크립트
+```
+
 전체 명령과 스펙 필드는 [SKILL.md](SKILL.md), Python으로 스크립트 쓰는 규칙은 [RULES.md](RULES.md), 시네마챗·노벨챗 제작 가이드(칸별 제한, 로어북, 매크로, 이미지, 점검표)는 [GUIDE.md](GUIDE.md)에 있습니다.
 
 ## 개인정보

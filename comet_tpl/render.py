@@ -12,6 +12,7 @@ import math
 import os
 import platform
 import re
+import urllib.parse
 import urllib.request
 
 
@@ -265,12 +266,17 @@ def _load_image(src: str):
         os.makedirs(CACHE, exist_ok=True)
         path = os.path.join(CACHE, hashlib.sha1(src.encode()).hexdigest())
         if not os.path.exists(path):
+            # Percent-encode non-ASCII (a hosted `…/호박집/초롱_3.webp`) the way a browser does;
+            # characters already escaped or reserved in a URL stay as they are.
+            url = urllib.parse.quote(src, safe=":/?#[]@!$&'()*+,;=%~")
             try:
-                req = urllib.request.Request(src, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=30) as r, open(path, "wb") as f:
-                    f.write(r.read())
-            except OSError:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    data = r.read()
+            except (OSError, ValueError):    # 404 or a bad URL: the site draws nothing either
                 return None
+            with open(path, "wb") as f:      # only a full download enters the cache
+                f.write(data)
     if not os.path.isfile(path):
         return None
     try:

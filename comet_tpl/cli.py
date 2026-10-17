@@ -749,6 +749,44 @@ def cmd_macro(a):
     print(out["result"])
 
 
+def cmd_host(a):
+    from . import host
+    if a.op == "init":
+        wrote = host.init(a.dir, a.name, a.force)
+        print(f"✓ 호스팅 폴더 {host.host_dir()}" + "".join(f"\n  + {w}" for w in wrote))
+    elif a.op == "add":
+        rows = host.add(a.work, a.paths, a.quality, a.max_side)
+        for name, state, size in rows:
+            print(f"  {state:<7} {name}  {size / 1024:,.0f} KB")
+        n = sum(1 for r in rows if r[1] != "same")
+        print(f"✓ {a.work}: {len(rows)}장 중 {n}장 변환 → `comet host deploy`로 올린다")
+    elif a.op == "ls":
+        for w, names in host.listing(a.work).items():
+            print(f"{w} ({len(names)}): {', '.join(names)}")
+    elif a.op == "deploy":
+        u = host.deploy()
+        print(f"✓ 배포: {u or '(주소를 못 읽음: wrangler 출력 확인)'}")
+    elif a.op == "url":
+        print(host.url_for(a.work, a.name or ""))
+        if a.var:
+            print(host.frame_snippet(a.work, a.var))
+    elif a.op == "check":
+        url = a.url
+        if not url:
+            first = next(((w, n) for w, ns in host.listing().items() for n in ns), None)
+            if not first:
+                sys.exit("✗ 올린 이미지가 없습니다")
+            pub = os.path.join(host.host_dir(), "public", first[0])
+            fn = next(f for f in os.listdir(pub) if os.path.splitext(f)[0] == first[1])
+            url = host.url_for(first[0], fn)
+        rows = host.verify(url)
+        print(url)
+        for ok, what, detail in rows:
+            print(f"  {'✓' if ok else '✗'} {what}: {detail}")
+        if not all(r[0] for r in rows):
+            sys.exit(1)
+
+
 def cmd_lorebook(a):
     data = _load(a.file)
     errs, warns = R.check_lorebooks(data)
@@ -943,6 +981,22 @@ def main(argv=None):
     lsub = s.add_subparsers(dest="op", required=True)
     q = lsub.add_parser("check"); q.add_argument("file"); q.add_argument("--strict", action="store_true")
     s.set_defaults(fn=cmd_lorebook)
+
+    s = sub.add_parser("host", help="외부 이미지 호스팅(Cloudflare Workers 정적 에셋): init · add · ls · deploy · url · check")
+    hsub = s.add_subparsers(dest="op", required=True)
+    q = hsub.add_parser("init", help="호스팅 폴더(wrangler.jsonc·worker.js·public/) 만들기")
+    q.add_argument("--dir"); q.add_argument("--name", help="Worker 이름(주소 앞부분). 기본 comet-img")
+    q.add_argument("--force", action="store_true", help="이미 있는 설정 파일도 새로 씀")
+    q = hsub.add_parser("add", help="이미지 → public/<작품>/<이름>.webp (파일 이름 = AI가 쓰는 이미지 이름)")
+    q.add_argument("work"); q.add_argument("paths", nargs="+", help="파일 또는 폴더(png·jpg·webp·gif)")
+    q.add_argument("--quality", type=int, default=90); q.add_argument("--max-side", type=int)
+    q = hsub.add_parser("ls"); q.add_argument("work", nargs="?")
+    hsub.add_parser("deploy", help="npx wrangler deploy (CLOUDFLARE_API_TOKEN 또는 wrangler login)")
+    q = hsub.add_parser("url", help="작품 주소와 프레임 value 스크립트")
+    q.add_argument("work"); q.add_argument("name", nargs="?"); q.add_argument("--var", help="프레임이 읽을 전역 변수(예: 장면)")
+    q = hsub.add_parser("check", help="사이트 로더가 하는 요청(CORS·프리플라이트·Range)을 그대로 해 본다")
+    q.add_argument("url", nargs="?")
+    s.set_defaults(fn=cmd_host)
 
     a = p.parse_args(argv)
     if a.cmd == "regex" and a.op == "image":

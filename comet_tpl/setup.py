@@ -49,7 +49,7 @@ def checks() -> list[tuple[str, str, str, str]]:
                      "uv를 설치하거나 `python3 -m pip install --user 'pillow>=10'` (preview·assets·upload 썸네일)"))
     node = shutil.which("node")
     rows.append(("ok" if node else "opt", "node", _version([node, "--version"]) if node else "없음",
-                 "regex test·macro test가 JS를 그대로 돌릴 때만. 없으면 check는 정적 검사"))
+                 "regex test·macro test가 JS를 그대로 돌릴 때, host deploy가 npx wrangler를 부를 때. 없으면 check는 정적 검사"))
     font = render._font_path(None)
     rows.append(("ok" if font else "opt", "한글 글꼴", font or "못 찾음",
                  "`comet config set font <ttf/otf/ttc 경로>` (미리보기 글자)"))

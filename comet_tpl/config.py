@@ -21,8 +21,10 @@ KEYS = {
     "works_dir": (None, "완성품을 둘 폴더. 아래에 템플릿/·시네마챗/·노벨챗/ 작품별 폴더"),
     "prompt_template": (None, "시네마챗·노벨챗 프롬프트를 시작할 내 템플릿 파일. 고정부는 그대로, 슬롯만 채운다"),
     "materials": ([], "창작 자료 목록 [{path, when}]: 에이전트가 'when' 단계 전에 읽는다"),
+    "host_dir": (None, "comet host 폴더(Cloudflare Workers 정적 에셋). 비우면 <works_dir>/호스팅, works_dir도 없으면 ~/comet-host"),
+    "host_url": (None, "배포된 호스팅 주소(https://<이름>.<계정>.workers.dev). comet host deploy가 저장"),
 }
-PATH_KEYS = {"chrome_dir", "font", "works_dir", "prompt_template"}
+PATH_KEYS = {"chrome_dir", "font", "works_dir", "prompt_template", "host_dir"}
 
 
 def load() -> dict:

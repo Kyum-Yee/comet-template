@@ -56,6 +56,7 @@ comet <명령> …        # comet setup이 설치한 명령. 없으면: uv run <
 | `regex range LO HI` · `regex words 말…` · `regex image --names a,b --range 1 10 --url '…/$1/$2.webp' [--default N] [--anon URL] [-o f.json]` | 수 범위·단어 목록 정규식(반복 0개), 이미지 매크로 네 단계 JSON |
 | `macro check m.json [--strict]` · `macro test m.json 글 [--user 이름] [--turn N] [--trace]` | 노벨챗 매크로 JSON 규격·정규식 검사 / 사이트 엔진과 같은 순서로 실행(체인, 위험 매크로 건너뛰기, `{user}` 조사 보정까지). `m.json` 자리에 노벨챗 스펙을 주면 이미지 매크로까지 저장될 순서 그대로 돈다 |
 | `lorebook check l.json [--strict]` | 로어북 JSON 규격·트리거·정규식 검사 |
+| `host init [--name comet-img]` · `host add 작품 파일·폴더… [--quality 90]` · `host ls` · `host deploy` · `host url 작품 [이름] [--var 장면]` · `host check [URL]` | 외부 이미지 호스팅(Cloudflare Workers 정적 에셋, CORS·Range 대응 worker). 시네마챗 이미지 탭 대신 프레임이 URL로 그린다. GUIDE 8장 |
 
 글 인자는 `@파일`이나 `-`(stdin)로도 준다. `regex test`·`macro test`는 node가 필요하다(정확한 JS 실행). 없으면 `check`는 정적 검사만 한다.
 
@@ -115,7 +116,7 @@ comet <명령> …        # comet setup이 설치한 명령. 없으면: uv run <
 | | `whiteSpace` normal | normal(줄바꿈 무시, 공백 압축)·pre-wrap(줄바꿈 유지) |
 | `image` | `src` **필수** | `images` 키, 로컬 파일, image.comet-talk.ai URL. 항상 contain으로 맞춤 → PNG를 레이어 비율로 만든다 |
 | | `action` | 클릭 스크립트. 비어 있으면 클릭이 아래 레이어로 통과 |
-| `frame` | `value` **필수** | 이미지 이름 또는 URL을 내는 표시값 스크립트. 보통 `"$배경"` |
+| `frame` | `value` **필수** | 이미지 이름 또는 URL을 내는 표시값 스크립트. 보통 `"$배경"`. 외부 호스팅이면 `"https://…/작품/" .. $배경 .. ".webp"`(`comet host url 작품 --var 배경`) |
 | | `objectFit` contain | contain(여백)·cover(잘라 채움) |
 | | `moping` none, `duration` 300 | 전환: none·fade(사라진 뒤 등장)·cross-fade(겹쳐 전환), ms |
 | | `borderRadius` 0 | 모서리 둥글기(px) |
@@ -359,6 +360,7 @@ comet preview template.json -o out.png \
 | `comet_tpl/api.py` | HTTP(세션 갱신·재시도), 업로드 캐시, 템플릿 CRUD |
 | `comet_tpl/auth.py` | 크롬 프로필 복사본 + 헤드리스 CDP로 세션 꺼내기(표준 라이브러리 웹소켓) |
 | `comet_tpl/render.py` | 해석기·렌더러 이식, 클릭 라우팅 |
+| `comet_tpl/host.py` | 외부 이미지 호스팅: Workers 정적 에셋 폴더·worker.js(CORS·프리플라이트·Range 206), webp 변환, wrangler 배포, 사이트 로더 요청 재현 검사 |
 | `comet_tpl/assets.py` | UI 소재 PNG |
 | `examples/vn-dialogue/` | 완성 예제(DSL): `template.json`, `assets/`, 미리보기용 `sample/`, `thumb.png` |
 | `examples/vn-dialogue-py/` | 같은 템플릿의 Python판: 한 줄 스크립트는 스펙에, 상태창 로직은 `logic.py` |
